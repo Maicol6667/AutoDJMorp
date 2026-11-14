@@ -2,6 +2,11 @@
 package com.autodjmorp
 
 import android.app.Activity
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionManager
+import android.os.Build
 import android.app.AlertDialog
 import android.content.ComponentName
 import android.media.session.MediaController
@@ -35,11 +40,18 @@ class MainActivity : Activity() {
     private lateinit var playStatus: TextView
     private lateinit var trackProgress: ProgressBar
     private lateinit var playControl: IconControlView
+    private lateinit var captureStatusText: TextView
+
+    companion object {
+        private const val REQUEST_AUDIO_PERMISSION = 701
+        private const val REQUEST_CAPTURE_PERMISSION = 702
+    }
 
     private val refreshTask = object : Runnable {
         override fun run() {
             updateCurrentSong()
             updatePlaybackIndicator()
+            updateCaptureResult()
             refreshQueueFromMorphe()
             checkAutoAdvance()
             handler.postDelayed(this, 1000)
@@ -219,6 +231,23 @@ class MainActivity : Activity() {
         }
         content.addView(autoDescription)
 
+
+        content.addView(makeTitle("PRUEBA DE AUDIO"))
+
+        val captureButton = makeButton("PROBAR CAPTURA DE AUDIO DE MORPHE")
+        captureButton.setOnClickListener { startCaptureTest() }
+        content.addView(captureButton, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 55
+        ).apply { topMargin = 6 })
+
+        captureStatusText = TextView(this).apply {
+            text = "Prueba pendiente. Reproduce una canción en Morphe y pulsa el botón."
+            textSize = 12f
+            setTextColor(Color.LTGRAY)
+            setPadding(4, 10, 4, 15)
+        }
+        content.addView(captureStatusText)
+
         val queueHeading = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -279,6 +308,86 @@ class MainActivity : Activity() {
         setContentView(root)
 
         refreshQueueFromMorphe()
+    }
+
+
+    private fun startCaptureTest() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            captureStatusText.text = "Esta prueba requiere Android 10 o superior."
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_AUDIO_PERMISSION)
+            return
+        }
+        requestCaptureConsent()
+    }
+
+    private fun requestCaptureConsent() {
+        val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_CAPTURE_PERMISSION)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_AUDIO_PERMISSION) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                requestCaptureConsent()
+            } else {
+                captureStatusText.text = "No se concedió el permiso necesario para realizar la prueba."
+            }
+        }
+    }
+
+    @Deprecated("Deprecated in Android API; retained for compatibility with this app")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_CAPTURE_PERMISSION) return
+        if (resultCode != RESULT_OK || data == null) {
+            captureStatusText.text = "Prueba cancelada. No se capturó ningún audio."
+            return
+        }
+        getSharedPreferences("AutoDJMusic", MODE_PRIVATE).edit()
+            .putString("capture_test_result", "RUNNING")
+            .putString("capture_test_detail", "")
+            .apply()
+        val serviceIntent = Intent(this, AudioCaptureTestService::class.java).apply {
+            putExtra("projection_result_code", resultCode)
+            putExtra("projection_data", data)
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+            captureStatusText.text = "Comprobando el audio de Morphe durante unos segundos..."
+        } catch (e: Exception) {
+            captureStatusText.text = "No se pudo iniciar la prueba de audio."
+        }
+    }
+
+    private fun updateCaptureResult() {
+        if (!::captureStatusText.isInitialized) return
+        val prefs = getSharedPreferences("AutoDJMusic", MODE_PRIVATE)
+        when (prefs.getString("capture_test_result", "NONE")) {
+            "RUNNING" -> captureStatusText.text = "Comprobando si Morphe permite capturar audio..."
+            "CAPTURED" -> {
+                captureStatusText.text = "✓ Se recibió audio de Morphe. Esto confirma captura, pero todavía no significa que podamos separar dos canciones para mezclarlas."
+                captureStatusText.setTextColor(Color.rgb(0, 220, 150))
+            }
+            "NO_AUDIO" -> {
+                captureStatusText.text = prefs.getString(
+                    "capture_test_detail",
+                    "No se recibió audio. Morphe podría bloquear la captura."
+                )
+                captureStatusText.setTextColor(Color.rgb(255, 180, 90))
+            }
+            else -> captureStatusText.text =
+                "Prueba pendiente. Reproduce una canción en Morphe y pulsa el botón."
+        }
     }
 
     private fun makeTitle(text: String): TextView {
