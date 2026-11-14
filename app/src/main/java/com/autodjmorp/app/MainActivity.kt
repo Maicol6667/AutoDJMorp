@@ -3,6 +3,10 @@ package com.autodjmorp
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ComponentName
+import android.media.session.MediaController
+import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -12,226 +16,290 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.*
-import android.media.session.MediaController
-import android.media.session.MediaSessionManager
-import android.content.ComponentName
 
 class MainActivity : Activity() {
 
-    private val songs = mutableListOf<String>()
-    private lateinit var queueLayout: LinearLayout
-    private lateinit var statusText: TextView
-    private lateinit var currentSongText: TextView
-    private lateinit var artistText: TextView
-
+    private val queue = mutableListOf<String>()
     private val handler = Handler(Looper.getMainLooper())
 
-    private val updateTask = object : Runnable {
+    private lateinit var currentSongText: TextView
+    private lateinit var artistText: TextView
+    private lateinit var connectionText: TextView
+    private lateinit var queueLayout: LinearLayout
+
+    private val refreshTask = object : Runnable {
         override fun run() {
             updateCurrentSong()
             handler.postDelayed(this, 1000)
         }
     }
 
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
-
-    private fun makeBackground(color: Int, radius: Int): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = dp(radius).toFloat()
-        }
-    }
-
-    private fun text(
-        value: String,
-        size: Float,
-        color: Int,
-        bold: Boolean = false
-    ): TextView {
-        return TextView(this).apply {
-            text = value
-            textSize = size
-            setTextColor(color)
-            if (bold) setTypeface(null, Typeface.BOLD)
-        }
-    }
-
-    private fun addSpace(layout: LinearLayout, height: Int) {
-        val space = View(this)
-        layout.addView(space, LinearLayout.LayoutParams(1, dp(height)))
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        window.statusBarColor = Color.rgb(15, 23, 42)
-        window.navigationBarColor = Color.rgb(15, 23, 42)
-
-        val backgroundColor = Color.rgb(15, 23, 42)
-        val cardColor = Color.rgb(30, 41, 59)
-        val white = Color.WHITE
-        val gray = Color.rgb(203, 213, 225)
-        val blue = Color.rgb(37, 99, 235)
-        val green = Color.rgb(52, 211, 153)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(22, 25, 22, 25)
+            setBackgroundColor(Color.rgb(15, 17, 24))
+        }
 
         val scroll = ScrollView(this)
-        scroll.setBackgroundColor(backgroundColor)
-
-        val main = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(25), dp(20), dp(30))
-        }
-
-        scroll.addView(main)
-
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val heading = LinearLayout(this).apply {
+        val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
-        heading.addView(text("AUTO DJ", 30f, white, true))
-        heading.addView(text("MORPHE · AUTOMATIC MIX", 11f, gray))
+        val title = TextView(this).apply {
+            text = "AUTO DJ"
+            textSize = 30f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+        }
 
-        header.addView(heading, LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(text("● ACTIVO", 12f, green, true))
-        main.addView(header)
+        content.addView(title)
 
-        addSpace(main, 25)
+        val subtitle = TextView(this).apply {
+            text = "Tu mezclador automático"
+            textSize = 14f
+            setTextColor(Color.LTGRAY)
+            gravity = Gravity.CENTER
+            setPadding(0, 5, 0, 25)
+        }
+
+        content.addView(subtitle)
 
         val currentCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(18))
-            setBackground(makeBackground(cardColor, 18))
+            setPadding(18, 18, 18, 18)
+            background = makeBackground(
+                Color.rgb(31, 36, 48),
+                18
+            )
         }
 
-        currentCard.addView(text("REPRODUCIENDO AHORA", 12f, green, true))
-        addSpace(currentCard, 15)
+        val currentLabel = TextView(this).apply {
+            text = "♫ REPRODUCIENDO AHORA"
+            textSize = 13f
+            setTextColor(Color.rgb(0, 220, 150))
+            typeface = Typeface.DEFAULT_BOLD
+        }
 
-        currentSongText = text("Buscando canción...", 23f, white, true)
+        currentCard.addView(currentLabel)
+
+        currentSongText = TextView(this).apply {
+            text = "Esperando canción..."
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, 15, 0, 5)
+        }
+
         currentCard.addView(currentSongText)
 
-        addSpace(currentCard, 5)
+        artistText = TextView(this).apply {
+            text = "Abre YouTube Music Morphe"
+            textSize = 14f
+            setTextColor(Color.LTGRAY)
+        }
 
-        artistText = text("Esperando artista", 14f, gray)
         currentCard.addView(artistText)
 
-        addSpace(currentCard, 20)
+        connectionText = TextView(this).apply {
+            text = "Esperando conexión..."
+            textSize = 12f
+            setTextColor(Color.GRAY)
+            setPadding(0, 12, 0, 0)
+        }
 
-        statusText = text("Esperando conexión con YouTube Music", 12f, gray)
-        currentCard.addView(statusText)
-        main.addView(currentCard)
+        currentCard.addView(connectionText)
 
-        addSpace(main, 15)
+        content.addView(
+            currentCard,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 20
+            }
+        )
+
+        val controlsTitle = makeTitle("CONTROLES DE MÚSICA")
+        content.addView(controlsTitle)
 
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(dp(10), dp(12), dp(10), dp(12))
-            setBackground(makeBackground(cardColor, 16))
         }
 
-        fun controlButton(label: String, action: () -> Unit) =
-            Button(this).apply {
-                text = label
-                textSize = 18f
-                setTextColor(white)
-                setBackground(makeBackground(blue, 14))
-                setOnClickListener { action() }
-            }
+        val previousButton = makeButton("⏮")
+        val playButton = makeButton("▶ / ⏸")
+        val nextButton = makeButton("⏭")
 
-        controls.addView(
-            controlButton("⏮") { sendMediaCommand("previous") },
-            LinearLayout.LayoutParams(0, dp(55), 1f).apply {
-                setMargins(dp(4), 0, dp(4), 0)
-            }
-        )
-
-        controls.addView(
-            controlButton("▶ / ⏸") { sendMediaCommand("playpause") },
-            LinearLayout.LayoutParams(0, dp(55), 1.5f).apply {
-                setMargins(dp(4), 0, dp(4), 0)
-            }
-        )
-
-        controls.addView(
-            controlButton("⏭") { sendMediaCommand("next") },
-            LinearLayout.LayoutParams(0, dp(55), 1f).apply {
-                setMargins(dp(4), 0, dp(4), 0)
-            }
-        )
-
-        main.addView(controls)
-
-        addSpace(main, 22)
-
-        val transitionCard = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            setBackground(makeBackground(cardColor, 16))
+        previousButton.setOnClickListener {
+            sendMediaCommand("previous")
         }
 
-        val transitionLabel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        playButton.setOnClickListener {
+            sendMediaCommand("playpause")
         }
 
-        transitionLabel.addView(text("MEZCLA AUTOMÁTICA", 15f, white, true))
-        transitionLabel.addView(text("Transición gradual de volumen", 12f, gray))
-
-        transitionCard.addView(
-            transitionLabel,
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
-        val autoSwitch = Switch(this).apply {
-            isChecked = true
+        nextButton.setOnClickListener {
+            sendMediaCommand("next")
         }
 
-        transitionCard.addView(autoSwitch)
-        main.addView(transitionCard)
+        controls.addView(previousButton, buttonParams())
+        controls.addView(playButton, buttonParams())
+        controls.addView(nextButton, buttonParams())
 
-        addSpace(main, 28)
-        main.addView(text("PRÓXIMAS CANCIONES", 17f, white, true))
-        addSpace(main, 12)
+        content.addView(controls)
+
+        val mixSwitch = Switch(this).apply {
+            text = "MEZCLA AUTOMÁTICA"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setPadding(0, 25, 0, 20)
+        }
+
+        mixSwitch.setOnCheckedChangeListener { _, enabled ->
+            val message = if (enabled) {
+                "Mezcla automática activada"
+            } else {
+                "Mezcla automática desactivada"
+            }
+
+            Toast.makeText(
+                this,
+                message,
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+
+        content.addView(mixSwitch)
+
+        val queueTitle = makeTitle("PRÓXIMAS CANCIONES")
+        content.addView(queueTitle)
 
         queueLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            setPadding(12, 12, 12, 12)
+            background = makeBackground(
+                Color.rgb(31, 36, 48),
+                16
+            )
         }
 
-        main.addView(queueLayout)
+        content.addView(queueLayout)
 
-        addSpace(main, 18)
-
-        val addButton = Button(this).apply {
-            text = "+  AGREGAR CANCIÓN"
-            textSize = 14f
-            setTextColor(white)
-            setBackground(makeBackground(blue, 14))
-            setOnClickListener { addSong() }
+        val addButton = makeButton("+ AGREGAR CANCIÓN")
+        addButton.setOnClickListener {
+            addSong()
         }
 
-        main.addView(addButton, LinearLayout.LayoutParams(-1, dp(55)))
+        content.addView(
+            addButton,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                55
+            ).apply {
+                topMargin = 20
+            }
+        )
 
-        addSpace(main, 20)
+        scroll.addView(content)
 
-        val footer = text("AUTO DJ MORPHE · VERSIÓN 1.0", 11f, gray)
-        footer.gravity = Gravity.CENTER
-        main.addView(footer)
+        root.addView(
+            scroll,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        )
 
-        setContentView(scroll)
+        setContentView(root)
+
         refreshQueue()
-        updateCurrentSong()
     }
 
-    private fun sendMediaCommand(command: String) {
+    private fun makeTitle(text: String): TextView {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, 15, 0, 12)
+        }
+    }
+
+    private fun makeButton(text: String): Button {
+        return Button(this).apply {
+            this.text = text
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            isAllCaps = false
+            background = makeBackground(
+                Color.rgb(0, 145, 105),
+                14
+            )
+        }
+    }
+
+    private fun buttonParams(): LinearLayout.LayoutParams {
+        return LinearLayout.LayoutParams(
+            0,
+            58,
+            1f
+        ).apply {
+            setMargins(4, 5, 4, 5)
+        }
+    }
+
+    private fun makeBackground(
+        color: Int,
+        radius: Int
+    ): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = radius.toFloat()
+        }
+    }
+
+    private fun updateCurrentSong() {
+        val preferences = getSharedPreferences(
+            "AutoDJMusic",
+            MODE_PRIVATE
+        )
+
+        val title = preferences.getString(
+            "music_title",
+            ""
+        ) ?: ""
+
+        val artist = preferences.getString(
+            "music_artist",
+            ""
+        ) ?: ""
+
+        if (title.isNotBlank()) {
+            currentSongText.text = title
+            artistText.text = artist
+            connectionText.text = "● Conectado a YouTube Music Morphe"
+            connectionText.setTextColor(
+                Color.rgb(0, 220, 150)
+            )
+        } else {
+            currentSongText.text = "Esperando canción..."
+            artistText.text = "Reproduce una canción en Morphe"
+            connectionText.text = "Esperando conexión..."
+            connectionText.setTextColor(Color.GRAY)
+        }
+    }
+
+    private fun sendMediaCommand(action: String) {
         try {
-            val manager = getSystemService(MEDIA_SESSION_SERVICE)
-                    as MediaSessionManager
+            val manager = getSystemService(
+                MEDIA_SESSION_SERVICE
+            ) as MediaSessionManager
 
             val component = ComponentName(
                 this,
@@ -245,99 +313,68 @@ class MainActivity : Activity() {
                 MODE_PRIVATE
             )
 
-            val targetPackage = preferences.getString(
+            val savedPackage = preferences.getString(
                 "music_package",
-                null
-            )
+                ""
+            ) ?: ""
 
             val controller = controllers.firstOrNull {
-                it.packageName == targetPackage
+                it.packageName.equals(
+                    savedPackage,
+                    ignoreCase = true
+                )
             } ?: controllers.firstOrNull {
-                it.packageName.contains("youtube", true) ||
-                it.packageName.contains("morphe", true)
+                it.packageName.contains(
+                    "youtube",
+                    ignoreCase = true
+                ) || it.packageName.contains(
+                    "morphe",
+                    ignoreCase = true
+                )
             }
 
             if (controller == null) {
-                statusText.text = "No se encontró la sesión de música"
+                Toast.makeText(
+                    this,
+                    "No se encontró el reproductor. Abre Morphe y reproduce una canción.",
+                    Toast.LENGTH_LONG
+                ).show()
                 return
             }
 
-            when (command) {
+            when (action) {
+                "previous" -> {
+                    controller.transportControls.skipToPrevious()
+                }
+
+                "next" -> {
+                    controller.transportControls.skipToNext()
+                }
+
                 "playpause" -> {
                     val state = controller.playbackState?.state
-                    if (state == MediaController.PlaybackState.STATE_PLAYING) {
+
+                    if (state == PlaybackState.STATE_PLAYING) {
                         controller.transportControls.pause()
                     } else {
                         controller.transportControls.play()
                     }
                 }
-                "next" -> controller.transportControls.skipToNext()
-                "previous" -> controller.transportControls.skipToPrevious()
             }
-
-            statusText.text = "Orden enviada a YouTube Music"
 
         } catch (e: SecurityException) {
-            statusText.text = "Activa el permiso de notificaciones"
+            Toast.makeText(
+                this,
+                "Activa el permiso de notificaciones de Auto DJ.",
+                Toast.LENGTH_LONG
+            ).show()
+
         } catch (e: Exception) {
-            statusText.text = "No se pudo controlar la reproducción"
-        }
-    }
-
-    private fun updateCurrentSong() {
-        val preferences = getSharedPreferences(
-            "AutoDJMusic",
-            MODE_PRIVATE
-        )
-
-        val title = preferences.getString("music_title", null)
-        val artist = preferences.getString("music_artist", "")
-
-        if (!title.isNullOrBlank()) {
-            currentSongText.text = title
-            artistText.text = artist?.ifBlank { "Artista no disponible" }
-                ?: "Artista no disponible"
-            statusText.text = "Conectado con YouTube Music"
-        } else {
-            currentSongText.text = "No se detecta ninguna canción"
-            artistText.text = "Reproduce música en YouTube Music"
-            statusText.text = "Esperando información musical"
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        handler.removeCallbacks(updateTask)
-        handler.post(updateTask)
-    }
-
-    override fun onPause() {
-        handler.removeCallbacks(updateTask)
-        super.onPause()
-    }
-
-    private fun refreshQueue() {
-        queueLayout.removeAllViews()
-
-        if (songs.isEmpty()) {
-            queueLayout.addView(
-                text("Tu lista está vacía. Agrega canciones.", 13f, Color.LTGRAY)
-            )
-            return
-        }
-
-        songs.forEachIndexed { index, song ->
-            val item = TextView(this).apply {
-                text = "${index + 1}     ♫     $song"
-                textSize = 15f
-                setTextColor(Color.WHITE)
-                setPadding(dp(15), dp(18), dp(15), dp(18))
-                setBackground(makeBackground(Color.rgb(30, 41, 59), 12))
-            }
-
-            val params = LinearLayout.LayoutParams(-1, -2)
-            params.bottomMargin = dp(9)
-            queueLayout.addView(item, params)
+            Toast.makeText(
+                this,
+                "No se pudo controlar el reproductor.",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -351,13 +388,53 @@ class MainActivity : Activity() {
             .setTitle("Agregar canción")
             .setView(input)
             .setPositiveButton("Agregar") { _, _ ->
-                val name = input.text.toString().trim()
-                if (name.isNotEmpty()) {
-                    songs.add(name)
+                val song = input.text.toString().trim()
+
+                if (song.isNotEmpty()) {
+                    queue.add(song)
                     refreshQueue()
                 }
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    private fun refreshQueue() {
+        if (!::queueLayout.isInitialized) return
+
+        queueLayout.removeAllViews()
+
+        if (queue.isEmpty()) {
+            val emptyText = TextView(this).apply {
+                text = "Todavía no hay canciones en la lista"
+                setTextColor(Color.LTGRAY)
+                textSize = 14f
+            }
+
+            queueLayout.addView(emptyText)
+            return
+        }
+
+        queue.forEachIndexed { index, song ->
+            val songText = TextView(this).apply {
+                text = "${index + 1}. $song"
+                textSize = 15f
+                setTextColor(Color.WHITE)
+                setPadding(5, 10, 5, 10)
+            }
+
+            queueLayout.addView(songText)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        handler.removeCallbacks(refreshTask)
+        handler.post(refreshTask)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        handler.removeCallbacks(refreshTask)
     }
 }
