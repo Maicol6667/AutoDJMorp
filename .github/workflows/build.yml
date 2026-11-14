@@ -7,6 +7,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,8 +29,20 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Validate AndroidManifest XML
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          try:
+              ET.parse("app/src/main/AndroidManifest.xml")
+              print("Manifest XML is valid")
+          except ET.ParseError as e:
+              print("MANIFEST XML ERROR:", e)
+              raise
+          PY
+
       - name: Build APK
-        run: gradle assembleDebug
+        run: gradle assembleDebug --stacktrace --info
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
