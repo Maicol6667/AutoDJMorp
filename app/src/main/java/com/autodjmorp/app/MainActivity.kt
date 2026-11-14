@@ -12,6 +12,9 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import android.media.session.MediaController
+import android.media.session.MediaSessionManager
+import android.content.ComponentName
 
 class MainActivity : Activity() {
 
@@ -123,6 +126,47 @@ class MainActivity : Activity() {
         currentCard.addView(statusText)
         main.addView(currentCard)
 
+        addSpace(main, 15)
+
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(10), dp(12), dp(10), dp(12))
+            setBackground(makeBackground(cardColor, 16))
+        }
+
+        fun controlButton(label: String, action: () -> Unit) =
+            Button(this).apply {
+                text = label
+                textSize = 18f
+                setTextColor(white)
+                setBackground(makeBackground(blue, 14))
+                setOnClickListener { action() }
+            }
+
+        controls.addView(
+            controlButton("⏮") { sendMediaCommand("previous") },
+            LinearLayout.LayoutParams(0, dp(55), 1f).apply {
+                setMargins(dp(4), 0, dp(4), 0)
+            }
+        )
+
+        controls.addView(
+            controlButton("▶ / ⏸") { sendMediaCommand("playpause") },
+            LinearLayout.LayoutParams(0, dp(55), 1.5f).apply {
+                setMargins(dp(4), 0, dp(4), 0)
+            }
+        )
+
+        controls.addView(
+            controlButton("⏭") { sendMediaCommand("next") },
+            LinearLayout.LayoutParams(0, dp(55), 1f).apply {
+                setMargins(dp(4), 0, dp(4), 0)
+            }
+        )
+
+        main.addView(controls)
+
         addSpace(main, 22)
 
         val transitionCard = LinearLayout(this).apply {
@@ -182,6 +226,62 @@ class MainActivity : Activity() {
         setContentView(scroll)
         refreshQueue()
         updateCurrentSong()
+    }
+
+    private fun sendMediaCommand(command: String) {
+        try {
+            val manager = getSystemService(MEDIA_SESSION_SERVICE)
+                    as MediaSessionManager
+
+            val component = ComponentName(
+                this,
+                MusicNotificationListener::class.java
+            )
+
+            val controllers = manager.getActiveSessions(component)
+
+            val preferences = getSharedPreferences(
+                "AutoDJMusic",
+                MODE_PRIVATE
+            )
+
+            val targetPackage = preferences.getString(
+                "music_package",
+                null
+            )
+
+            val controller = controllers.firstOrNull {
+                it.packageName == targetPackage
+            } ?: controllers.firstOrNull {
+                it.packageName.contains("youtube", true) ||
+                it.packageName.contains("morphe", true)
+            }
+
+            if (controller == null) {
+                statusText.text = "No se encontró la sesión de música"
+                return
+            }
+
+            when (command) {
+                "playpause" -> {
+                    val state = controller.playbackState?.state
+                    if (state == MediaController.PlaybackState.STATE_PLAYING) {
+                        controller.transportControls.pause()
+                    } else {
+                        controller.transportControls.play()
+                    }
+                }
+                "next" -> controller.transportControls.skipToNext()
+                "previous" -> controller.transportControls.skipToPrevious()
+            }
+
+            statusText.text = "Orden enviada a YouTube Music"
+
+        } catch (e: SecurityException) {
+            statusText.text = "Activa el permiso de notificaciones"
+        } catch (e: Exception) {
+            statusText.text = "No se pudo controlar la reproducción"
+        }
     }
 
     private fun updateCurrentSong() {
