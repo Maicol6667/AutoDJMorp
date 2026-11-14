@@ -16,6 +16,7 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import android.content.res.ColorStateList
 
 class MainActivity : Activity() {
 
@@ -28,10 +29,14 @@ class MainActivity : Activity() {
     private lateinit var artistText: TextView
     private lateinit var connectionText: TextView
     private lateinit var queueLayout: LinearLayout
+    private lateinit var playStatus: TextView
+    private lateinit var trackProgress: ProgressBar
+    private lateinit var playControl: TextView
 
     private val refreshTask = object : Runnable {
         override fun run() {
             updateCurrentSong()
+            updatePlaybackIndicator()
             refreshQueueFromMorphe()
             checkAutoAdvance()
             handler.postDelayed(this, 1000)
@@ -44,7 +49,7 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(22, 25, 22, 25)
-            setBackgroundColor(Color.rgb(15, 17, 24))
+            setBackgroundColor(Color.rgb(247, 247, 247))
         }
 
         val scroll = ScrollView(this)
@@ -55,7 +60,7 @@ class MainActivity : Activity() {
         val title = TextView(this).apply {
             text = "AUTO DJ"
             textSize = 30f
-            setTextColor(Color.WHITE)
+            setTextColor(Color.rgb(59, 53, 60))
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
         }
@@ -65,97 +70,117 @@ class MainActivity : Activity() {
         val subtitle = TextView(this).apply {
             text = "Tu mezclador automático"
             textSize = 14f
-            setTextColor(Color.LTGRAY)
+            setTextColor(Color.rgb(105, 99, 106))
             gravity = Gravity.CENTER
             setPadding(0, 5, 0, 25)
         }
 
         content.addView(subtitle)
 
-        val currentCard = LinearLayout(this).apply {
+        val playerWrapper = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(18, 18, 18, 18)
-            background = makeBackground(
-                Color.rgb(31, 36, 48),
-                18
-            )
+            gravity = Gravity.CENTER
+            setPadding(8, 8, 8, 8)
         }
 
-        val currentLabel = TextView(this).apply {
-            text = "♫ REPRODUCIENDO AHORA"
-            textSize = 13f
-            setTextColor(Color.rgb(0, 220, 150))
+        val statusRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 10)
+        }
+        statusRow.addView(TextView(this).apply {
+            text = "♪"
+            textSize = 25f
+            setTextColor(Color.rgb(59, 53, 60))
+            setPadding(0, 0, 9, 0)
+        })
+        playStatus = TextView(this).apply {
+            text = "pause"
+            textSize = 14f
             typeface = Typeface.DEFAULT_BOLD
+            letterSpacing = 0.5f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setPadding(20, 5, 20, 5)
+            background = makeBackground(Color.rgb(59, 53, 60), 30)
         }
+        statusRow.addView(playStatus)
+        playerWrapper.addView(statusRow)
 
-        currentCard.addView(currentLabel)
+        val playerBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(24, 30, 24, 24)
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                setStroke(2, Color.rgb(59, 53, 60))
+            }
+        }
 
         currentSongText = TextView(this).apply {
             text = "Esperando canción..."
-            textSize = 20f
-            setTextColor(Color.WHITE)
+            textSize = 19f
+            setTextColor(Color.rgb(59, 53, 60))
             typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, 15, 0, 5)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 5)
         }
-
-        currentCard.addView(currentSongText)
+        playerBox.addView(currentSongText)
 
         artistText = TextView(this).apply {
             text = "Abre YouTube Music Morphe"
-            textSize = 14f
-            setTextColor(Color.LTGRAY)
+            textSize = 13f
+            setTextColor(Color.rgb(105, 99, 106))
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 22)
         }
+        playerBox.addView(artistText)
 
-        currentCard.addView(artistText)
-
-        connectionText = TextView(this).apply {
-            text = "Esperando conexión..."
-            textSize = 12f
-            setTextColor(Color.GRAY)
-            setPadding(0, 12, 0, 0)
+        trackProgress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 1000
+            progress = 0
+            progressTintList = ColorStateList.valueOf(Color.rgb(59, 53, 60))
+            progressBackgroundTintList = ColorStateList.valueOf(Color.rgb(220, 217, 221))
         }
-
-        currentCard.addView(connectionText)
-
-        content.addView(
-            currentCard,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                bottomMargin = 20
-            }
-        )
-
-        val controlsTitle = makeTitle("CONTROLES DE MÚSICA")
-        content.addView(controlsTitle)
+        playerBox.addView(trackProgress, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 3
+        ).apply { bottomMargin = 23 })
 
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-
-        val previousButton = makeControlButton("⏮", false, "Canción anterior")
-        val playButton = makeControlButton("▶", true, "Reproducir o pausar")
-        val nextButton = makeControlButton("⏭", false, "Siguiente canción")
-
-        previousButton.setOnClickListener {
-            sendMediaCommand("previous")
+        val previousButton = makeIconButton("previous", "Canción anterior")
+        playControl = makeIconButton("pause", "Reproducir o pausar")
+        val nextButton = makeIconButton("next", "Siguiente canción")
+        previousButton.setOnClickListener { sendMediaCommand("previous") }
+        playControl.setOnClickListener { sendMediaCommand("playpause") }
+        nextButton.setOnClickListener { sendMediaCommand("next") }
+        controls.addView(previousButton, LinearLayout.LayoutParams(42, 42).apply {
+            setMargins(18, 0, 18, 0)
+        })
+        controls.addView(playControl, LinearLayout.LayoutParams(42, 42).apply {
+            setMargins(18, 0, 18, 0)
+        })
+        controls.addView(nextButton, LinearLayout.LayoutParams(42, 42).apply {
+            setMargins(18, 0, 18, 0)
+        })
+        playerBox.addView(controls)
+        playerWrapper.addView(playerBox)
+        connectionText = TextView(this).apply {
+            text = "Esperando conexión con Morphe..."
+            textSize = 11f
+            setTextColor(Color.rgb(105, 99, 106))
+            gravity = Gravity.CENTER
+            setPadding(0, 12, 0, 0)
         }
+        playerWrapper.addView(connectionText)
+        content.addView(playerWrapper, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = 12 })
 
-        playButton.setOnClickListener {
-            sendMediaCommand("playpause")
-        }
-
-        nextButton.setOnClickListener {
-            sendMediaCommand("next")
-        }
-
-        controls.addView(previousButton, controlButtonParams())
-        controls.addView(playButton, controlButtonParams())
-        controls.addView(nextButton, controlButtonParams())
-
-        content.addView(controls)
+        content.addView(makeTitle("CONTROLES DE MÚSICA"))
 
         autoAdvanceEnabled = getSharedPreferences("AutoDJMusic", MODE_PRIVATE)
             .getBoolean("auto_advance", false)
@@ -231,14 +256,14 @@ class MainActivity : Activity() {
 
         setContentView(root)
 
-        refreshQueue()
+        refreshQueueFromMorphe()
     }
 
     private fun makeTitle(text: String): TextView {
         return TextView(this).apply {
             this.text = text
             textSize = 16f
-            setTextColor(Color.WHITE)
+            setTextColor(Color.rgb(59, 53, 60))
             typeface = Typeface.DEFAULT_BOLD
             setPadding(0, 15, 0, 12)
         }
@@ -251,36 +276,32 @@ class MainActivity : Activity() {
             setTextColor(Color.WHITE)
             isAllCaps = false
             background = makeBackground(
-                Color.rgb(0, 145, 105),
+                Color.rgb(59, 53, 60),
                 14
             )
         }
     }
 
-    private fun makeControlButton(
-        symbol: String,
-        primary: Boolean,
-        description: String
-    ): TextView {
+    private fun makeIconButton(kind: String, description: String): TextView {
         return TextView(this).apply {
-            text = symbol
             contentDescription = description
             gravity = Gravity.CENTER
-            textSize = if (primary) 27f else 24f
+            textSize = if (kind == "pause") 21f else 23f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.WHITE)
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(
-                    if (primary) Color.rgb(116, 82, 220)
-                    else Color.rgb(35, 40, 55)
-                )
-                setStroke(
-                    if (primary) 0 else 2,
-                    if (primary) Color.TRANSPARENT else Color.rgb(91, 103, 133)
-                )
+            setTextColor(if (kind == "pause") Color.WHITE else Color.rgb(59, 53, 60))
+            text = when (kind) {
+                "previous" -> "◀|"
+                "next" -> "|▶"
+                else -> "Ⅱ"
             }
-            elevation = if (primary) 8f else 3f
+            if (kind == "pause") {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.rgb(59, 53, 60))
+                }
+            } else {
+                background = null
+            }
             isClickable = true
             isFocusable = true
         }
@@ -343,6 +364,34 @@ class MainActivity : Activity() {
             artistText.text = "Reproduce una canción en Morphe"
             connectionText.text = "Esperando conexión..."
             connectionText.setTextColor(Color.GRAY)
+        }
+    }
+
+    private fun updatePlaybackIndicator() {
+        try {
+            val manager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val component = ComponentName(this, MusicNotificationListener::class.java)
+            val controllers = manager.getActiveSessions(component)
+            val savedPackage = getSharedPreferences("AutoDJMusic", MODE_PRIVATE)
+                .getString("music_package", "").orEmpty()
+            val controller = controllers.firstOrNull {
+                savedPackage.isNotBlank() && it.packageName.equals(savedPackage, true)
+            } ?: controllers.firstOrNull {
+                it.packageName.contains("youtube", true) || it.packageName.contains("morphe", true)
+            }
+            val state = controller?.playbackState
+            val playing = state?.state == PlaybackState.STATE_PLAYING
+            playStatus.text = if (playing) "play" else "pause"
+            playControl.text = if (playing) "Ⅱ" else "▶"
+            val duration = controller?.metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+            val position = state?.position ?: 0L
+            trackProgress.progress = if (duration > 0L) {
+                ((position.coerceAtLeast(0L).toDouble() / duration.toDouble()) * 1000).toInt().coerceIn(0, 1000)
+            } else 0
+        } catch (_: Exception) {
+            playStatus.text = "pause"
+            playControl.text = "▶"
+            trackProgress.progress = 0
         }
     }
 
