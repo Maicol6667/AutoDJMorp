@@ -19,7 +19,9 @@ import android.widget.*
 
 class MainActivity : Activity() {
 
-    private val queue = mutableListOf<String>()
+    private var autoAdvanceEnabled = false
+    private var lastAutoAdvancedTrack = ""
+    private var lastQueueSignature = ""
     private val handler = Handler(Looper.getMainLooper())
 
     private lateinit var currentSongText: TextView
@@ -30,6 +32,8 @@ class MainActivity : Activity() {
     private val refreshTask = object : Runnable {
         override fun run() {
             updateCurrentSong()
+            refreshQueueFromMorphe()
+            checkAutoAdvance()
             handler.postDelayed(this, 1000)
         }
     }
@@ -153,28 +157,36 @@ class MainActivity : Activity() {
 
         content.addView(controls)
 
-        val mixSwitch = Switch(this).apply {
-            text = "MEZCLA AUTOMÁTICA"
+        autoAdvanceEnabled = getSharedPreferences("AutoDJMusic", MODE_PRIVATE)
+            .getBoolean("auto_advance", false)
+
+        val autoSwitch = Switch(this).apply {
+            text = "AVANCE AUTOMÁTICO"
             textSize = 16f
             setTextColor(Color.WHITE)
-            setPadding(0, 25, 0, 20)
+            setPadding(0, 25, 0, 8)
+            isChecked = autoAdvanceEnabled
         }
 
-        mixSwitch.setOnCheckedChangeListener { _, enabled ->
-            val message = if (enabled) {
-                "Mezcla automática activada"
-            } else {
-                "Mezcla automática desactivada"
-            }
-
-            Toast.makeText(
-                this,
-                message,
-                Toast.LENGTH_SHORT
-            ).show()
+        autoSwitch.setOnCheckedChangeListener { _, enabled ->
+            autoAdvanceEnabled = enabled
+            getSharedPreferences("AutoDJMusic", MODE_PRIVATE).edit()
+                .putBoolean("auto_advance", enabled).apply()
+            lastAutoAdvancedTrack = ""
+            Toast.makeText(this,
+                if (enabled) "Avance automático activado" else "Avance automático desactivado",
+                Toast.LENGTH_SHORT).show()
         }
 
-        content.addView(mixSwitch)
+        content.addView(autoSwitch)
+
+        val autoDescription = TextView(this).apply {
+            text = "Pasa a la siguiente canción cuando la actual esté por terminar. Morphe controla el audio; esta versión no superpone dos canciones."
+            textSize = 12f
+            setTextColor(Color.LTGRAY)
+            setPadding(0, 0, 0, 15)
+        }
+        content.addView(autoDescription)
 
         val queueTitle = makeTitle("PRÓXIMAS CANCIONES")
         content.addView(queueTitle)
@@ -190,13 +202,14 @@ class MainActivity : Activity() {
 
         content.addView(queueLayout)
 
-        val addButton = makeButton("+ AGREGAR CANCIÓN")
-        addButton.setOnClickListener {
-            addSong()
+        val refreshButton = makeButton("↻ ACTUALIZAR COLA DE MORPHE")
+        refreshButton.setOnClickListener {
+            lastQueueSignature = ""
+            refreshQueueFromMorphe()
         }
 
         content.addView(
-            addButton,
+            refreshButton,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 55
@@ -416,52 +429,77 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun addSong() {
-        val input = EditText(this).apply {
-            hint = "Nombre de la canción"
-            setSingleLine(true)
+    private fun refreshQueueFromMorphe() {
+        if (!::queueLayout.isInitialized) return
+        val queue = try {
+            val manager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val component = ComponentName(this, MusicNotificationListener::class.java)
+            val controllers = manager.getActiveSessions(component)
+            val savedPackage = getSharedPreferences("AutoDJMusic", MODE_PRIVATE)
+                .getString("music_package", "").orEmpty()
+            val controller = controllers.firstOrNull {
+                savedPackage.isNotBlank() && it.packageName.equals(savedPackage, true)
+            } ?: controllers.firstOrNull {
+                it.packageName.contains("youtube", true) || it.packageName.contains("morphe", true)
+            }
+            controller?.queue.orEmpty().mapNotNull {
+                it.description.title?.toString()?.trim()
+            }.filter { it.isNotBlank() }
+        } catch (_: Exception) {
+            emptyList()
         }
 
-        AlertDialog.Builder(this)
-            .setTitle("Agregar canción")
-            .setView(input)
-            .setPositiveButton("Agregar") { _, _ ->
-                val song = input.text.toString().trim()
-
-                if (song.isNotEmpty()) {
-                    queue.add(song)
-                    refreshQueue()
-                }
-            }
-            .setNegativeButton("Cancelar", null)
-            .show()
-    }
-
-    private fun refreshQueue() {
-        if (!::queueLayout.isInitialized) return
-
+        val signature = queue.joinToString("|")
+        if (signature == lastQueueSignature && queueLayout.childCount > 0) return
+        lastQueueSignature = signature
         queueLayout.removeAllViews()
 
         if (queue.isEmpty()) {
-            val emptyText = TextView(this).apply {
-                text = "Todavía no hay canciones en la lista"
+            queueLayout.addView(TextView(this).apply {
+                text = "Morphe no está compartiendo su lista de reproducción ahora. Los controles de canción seguirán funcionando."
                 setTextColor(Color.LTGRAY)
                 textSize = 14f
-            }
-
-            queueLayout.addView(emptyText)
+            })
             return
         }
 
-        queue.forEachIndexed { index, song ->
-            val songText = TextView(this).apply {
+        queue.take(30).forEachIndexed { index, song ->
+            queueLayout.addView(TextView(this).apply {
                 text = "${index + 1}. $song"
                 textSize = 15f
                 setTextColor(Color.WHITE)
-                setPadding(5, 10, 5, 10)
-            }
+                setPadding(5, 9, 5, 9)
+            })
+        }
+    }
 
-            queueLayout.addView(songText)
+    private fun checkAutoAdvance() {
+        if (!autoAdvanceEnabled) return
+        try {
+            val manager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val component = ComponentName(this, MusicNotificationListener::class.java)
+            val savedPackage = getSharedPreferences("AutoDJMusic", MODE_PRIVATE)
+                .getString("music_package", "").orEmpty()
+            val controller = manager.getActiveSessions(component).firstOrNull {
+                savedPackage.isNotBlank() && it.packageName.equals(savedPackage, true)
+            } ?: manager.getActiveSessions(component).firstOrNull {
+                it.packageName.contains("youtube", true) || it.packageName.contains("morphe", true)
+            } ?: return
+
+            val state = controller.playbackState ?: return
+            if (state.state != PlaybackState.STATE_PLAYING) return
+            val metadata = controller.metadata ?: return
+            val duration = metadata.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION)
+            val position = state.position
+            if (duration <= 0L || position < 0L) return
+
+            val key = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE).orEmpty() +
+                "|" + duration
+            if (duration - position in 1..6500 && key != lastAutoAdvancedTrack) {
+                lastAutoAdvancedTrack = key
+                controller.transportControls.skipToNext()
+            }
+        } catch (_: Exception) {
         }
     }
 
