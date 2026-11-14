@@ -36,11 +36,12 @@ jobs:
           import base64, json, os
           config = json.loads(os.environ["AUTODJ_SIGNING_CONFIG"])
           with open("app/release-key.jks", "wb") as key:
-              key.write(base64.b64decode(config["keystore_base64"]))
+              key.write(base64.b64decode(config["keystore_base64"], validate=True))
           with open(os.environ["GITHUB_ENV"], "a") as env:
               env.write("AUTODJ_STORE_PASSWORD=" + config["store_password"] + "\n")
               env.write("AUTODJ_KEY_ALIAS=" + config["key_alias"] + "\n")
-              env.write("AUTODJ_KEY_PASSWORD=" + config["key_password"] + "\n")
+              # The keystore was created with the same password for the store and key.
+              env.write("AUTODJ_KEY_PASSWORD=" + config["store_password"] + "\n")
           PY
 
       - name: Validate AndroidManifest XML
