@@ -30,7 +30,7 @@ jobs:
 
       - name: Prepare permanent signing key
         env:
-          AUTODJ_SIGNING_CONFIG: ${{ secrets.AUTODJ_SIGNING_CONFIG }}
+          AUTODJ_SIGNING_CONFIG: \${{ secrets.AUTODJ_SIGNING_CONFIG }}
         run: |
           python3 - <<'PY'
           import base64, json, os
@@ -38,9 +38,9 @@ jobs:
           with open("app/release-key.jks", "wb") as key:
               key.write(base64.b64decode(config["keystore_base64"]))
           with open(os.environ["GITHUB_ENV"], "a") as env:
-              env.write("AUTODJ_STORE_PASSWORD=" + config["store_password"] + "\\n")
-              env.write("AUTODJ_KEY_ALIAS=" + config["key_alias"] + "\\n")
-              env.write("AUTODJ_KEY_PASSWORD=" + config["key_password"] + "\\n")
+              env.write("AUTODJ_STORE_PASSWORD=" + config["store_password"] + "\n")
+              env.write("AUTODJ_KEY_ALIAS=" + config["key_alias"] + "\n")
+              env.write("AUTODJ_KEY_PASSWORD=" + config["key_password"] + "\n")
           PY
 
       - name: Validate AndroidManifest XML
