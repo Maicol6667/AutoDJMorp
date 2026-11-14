@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+
     <application
         android:label="Auto DJ Morphe"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
@@ -15,6 +19,12 @@
             </intent-filter>
 
         </activity>
+
+        <service
+            android:name="com.autodjmorp.AudioCaptureTestService"
+            android:label="Prueba de audio Auto DJ"
+            android:foregroundServiceType="mediaProjection"
+            android:exported="false" />
 
         <service
             android:name="com.autodjmorp.MusicNotificationListener"
