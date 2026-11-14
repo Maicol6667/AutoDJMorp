@@ -1,40 +1,275 @@
-
 package com.autodjmorp
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.os.Bundle
 import android.graphics.Color
+import android.graphics.Typeface
 import android.view.Gravity
-import android.widget.LinearLayout
-import android.widget.TextView
+import android.view.View
+import android.widget.*
+import android.graphics.drawable.GradientDrawable
 
 class MainActivity : Activity() {
+
+    private val songs = mutableListOf<String>(
+        "Agrega tu primera canción"
+    )
+
+    private lateinit var queueLayout: LinearLayout
+    private lateinit var statusText: TextView
+
+    private var transitionEnabled = true
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    private fun makeBackground(color: Int, radius: Int): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radius).toFloat()
+        }
+    }
+
+    private fun text(
+        value: String,
+        size: Float,
+        color: Int,
+        bold: Boolean = false
+    ): TextView {
+        return TextView(this).apply {
+            text = value
+            textSize = size
+            setTextColor(color)
+            if (bold) setTypeface(null, Typeface.BOLD)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val layout = LinearLayout(this)
-        layout.orientation = LinearLayout.VERTICAL
-        layout.gravity = Gravity.CENTER
-        layout.setPadding(30, 30, 30, 30)
-        layout.setBackgroundColor(Color.rgb(18, 18, 28))
+        window.statusBarColor = Color.rgb(15, 23, 42)
+        window.navigationBarColor = Color.rgb(15, 23, 42)
 
-        val title = TextView(this)
-        title.text = "AUTO DJ MORPHE"
-        title.textSize = 30f
-        title.setTextColor(Color.WHITE)
-        title.gravity = Gravity.CENTER
+        val background = Color.rgb(15, 23, 42)
+        val cardColor = Color.rgb(30, 41, 59)
+        val white = Color.WHITE
+        val gray = Color.rgb(203, 213, 225)
+        val blue = Color.rgb(37, 99, 235)
+        val green = Color.rgb(52, 211, 153)
 
-        val message = TextView(this)
-        message.text = "¡Bienvenido!\n\nTu proyecto Auto DJ está instalado."
-        message.textSize = 18f
-        message.setTextColor(Color.LTGRAY)
-        message.gravity = Gravity.CENTER
-        message.setPadding(10, 40, 10, 10)
+        val scroll = ScrollView(this)
+        scroll.setBackgroundColor(background)
 
-        layout.addView(title)
-        layout.addView(message)
+        val main = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(25), dp(20), dp(30))
+        }
 
-        setContentView(layout)
+        scroll.addView(main)
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val heading = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        heading.addView(text("AUTO DJ", 30f, white, true))
+        heading.addView(text("MORPHE · AUTOMATIC MIX", 11f, gray))
+
+        header.addView(
+            heading,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        header.addView(text("● ACTIVO", 12f, green, true))
+        main.addView(header)
+
+        addSpace(main, 25)
+
+        val currentCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            background = makeBackground(cardColor, 18)
+        }
+
+        currentCard.addView(
+            text("REPRODUCIENDO AHORA", 12f, green, true)
+        )
+
+        addSpace(currentCard, 15)
+
+        currentCard.addView(
+            text("♫  Canción actual", 23f, white, true)
+        )
+
+        addSpace(currentCard, 5)
+
+        currentCard.addView(
+            text("YouTube Music Morphe", 14f, gray)
+        )
+
+        addSpace(currentCard, 20)
+
+        statusText = text(
+            "Esperando conexión con YouTube Music",
+            12f,
+            gray
+        )
+        currentCard.addView(statusText)
+
+        main.addView(currentCard)
+
+        addSpace(main, 22)
+
+        val transitionCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            background = makeBackground(cardColor, 16)
+        }
+
+        val transitionLabel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        transitionLabel.addView(
+            text("MEZCLA AUTOMÁTICA", 15f, white, true)
+        )
+
+        transitionLabel.addView(
+            text("Transición gradual de volumen", 12f, gray)
+        )
+
+        transitionCard.addView(
+            transitionLabel,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        val switch = Switch(this).apply {
+            isChecked = true
+            setOnCheckedChangeListener { _, checked ->
+                transitionEnabled = checked
+                statusText.text = if (checked) {
+                    "Transición automática activada"
+                } else {
+                    "Transición automática desactivada"
+                }
+            }
+        }
+
+        transitionCard.addView(switch)
+        main.addView(transitionCard)
+
+        addSpace(main, 28)
+
+        main.addView(text("PRÓXIMAS CANCIONES", 17f, white, true))
+
+        addSpace(main, 12)
+
+        queueLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        main.addView(queueLayout)
+
+        addSpace(main, 18)
+
+        val addButton = Button(this).apply {
+            text = "+  AGREGAR CANCIÓN"
+            textSize = 14f
+            setTextColor(white)
+            background = makeBackground(blue, 14)
+            setOnClickListener {
+                addSong()
+            }
+        }
+
+        main.addView(
+            addButton,
+            LinearLayout.LayoutParams(-1, dp(55))
+        )
+
+        addSpace(main, 20)
+
+        val footer = text(
+            "AUTO DJ MORPHE · VERSIÓN 1.0",
+            11f,
+            gray
+        )
+        footer.gravity = Gravity.CENTER
+        main.addView(footer)
+
+        setContentView(scroll)
+
+        refreshQueue()
+    }
+
+    private fun addSpace(layout: LinearLayout, height: Int) {
+        val space = View(this)
+        layout.addView(
+            space,
+            LinearLayout.LayoutParams(1, dp(height))
+        )
+    }
+
+    private fun refreshQueue() {
+        queueLayout.removeAllViews()
+
+        if (songs.size == 1 &&
+            songs[0] == "Agrega tu primera canción") {
+            queueLayout.addView(
+                text("Tu lista está vacía. Agrega canciones.", 13f,
+                    Color.LTGRAY)
+            )
+            return
+        }
+
+        songs.forEachIndexed { index, song ->
+            val item = TextView(this).apply {
+                text = "${index + 1}     ♫     $song"
+                textSize = 15f
+                setTextColor(Color.WHITE)
+                setPadding(dp(15), dp(18), dp(15), dp(18))
+                background = makeBackground(
+                    Color.rgb(30, 41, 59), 12
+                )
+            }
+
+            val params = LinearLayout.LayoutParams(
+                -1, -2
+            )
+            params.bottomMargin = dp(9)
+            queueLayout.addView(item, params)
+        }
+    }
+
+    private fun addSong() {
+        val input = EditText(this).apply {
+            hint = "Nombre de la canción"
+            setSingleLine(true)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Agregar canción")
+            .setView(input)
+            .setPositiveButton("Agregar") { _, _ ->
+                val name = input.text.toString().trim()
+
+                if (name.isNotEmpty()) {
+                    if (songs.size == 1 &&
+                        songs[0] == "Agrega tu primera canción") {
+                        songs.clear()
+                    }
+
+                    songs.add(name)
+                    refreshQueue()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 }
