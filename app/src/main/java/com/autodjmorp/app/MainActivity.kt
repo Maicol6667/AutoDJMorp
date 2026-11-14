@@ -12,6 +12,9 @@ import android.os.Handler
 import android.os.Looper
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
@@ -31,7 +34,7 @@ class MainActivity : Activity() {
     private lateinit var queueLayout: LinearLayout
     private lateinit var playStatus: TextView
     private lateinit var trackProgress: ProgressBar
-    private lateinit var playControl: TextView
+    private lateinit var playControl: IconControlView
 
     private val refreshTask = object : Runnable {
         override fun run() {
@@ -150,20 +153,23 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        val previousButton = makeIconButton("previous", "Canción anterior")
-        playControl = makeIconButton("pause", "Reproducir o pausar")
-        val nextButton = makeIconButton("next", "Siguiente canción")
+        val previousButton = IconControlView(this, "previous")
+        playControl = IconControlView(this, "play")
+        val nextButton = IconControlView(this, "next")
+        previousButton.contentDescription = "Canción anterior"
+        playControl.contentDescription = "Reproducir o pausar"
+        nextButton.contentDescription = "Siguiente canción"
         previousButton.setOnClickListener { sendMediaCommand("previous") }
         playControl.setOnClickListener { sendMediaCommand("playpause") }
         nextButton.setOnClickListener { sendMediaCommand("next") }
         controls.addView(previousButton, LinearLayout.LayoutParams(58, 58).apply {
-            setMargins(14, 0, 14, 0)
+            setMargins(20, 0, 20, 0)
         })
         controls.addView(playControl, LinearLayout.LayoutParams(68, 68).apply {
-            setMargins(14, 0, 14, 0)
+            setMargins(20, 0, 20, 0)
         })
         controls.addView(nextButton, LinearLayout.LayoutParams(58, 58).apply {
-            setMargins(14, 0, 14, 0)
+            setMargins(20, 0, 20, 0)
         })
         playerBox.addView(controls)
         playerWrapper.addView(playerBox)
@@ -213,8 +219,24 @@ class MainActivity : Activity() {
         }
         content.addView(autoDescription)
 
-        val queueTitle = makeTitle("PRÓXIMAS CANCIONES")
-        content.addView(queueTitle)
+        val queueHeading = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 15, 0, 12)
+        }
+        queueHeading.addView(TextView(this).apply {
+            text = "♫"
+            textSize = 23f
+            setTextColor(Color.rgb(180, 155, 255))
+            setPadding(0, 0, 10, 0)
+        })
+        queueHeading.addView(TextView(this).apply {
+            text = "PRÓXIMAS CANCIONES"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+        })
+        content.addView(queueHeading)
 
         queueLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -279,29 +301,6 @@ class MainActivity : Activity() {
                 Color.rgb(59, 53, 60),
                 14
             )
-        }
-    }
-
-    private fun makeIconButton(kind: String, description: String): TextView {
-        return TextView(this).apply {
-            contentDescription = description
-            gravity = Gravity.CENTER
-            textSize = if (kind == "pause") 28f else 25f
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            text = when (kind) {
-                "previous" -> "⏮"
-                "next" -> "⏭"
-                else -> "Ⅱ"
-            }
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(if (kind == "pause") Color.rgb(75, 55, 125) else Color.rgb(30, 30, 36))
-                setStroke(2, Color.rgb(110, 105, 120))
-            }
-            isClickable = true
-            isFocusable = true
-            elevation = 4f
         }
     }
 
@@ -380,7 +379,7 @@ class MainActivity : Activity() {
             val state = controller?.playbackState
             val playing = state?.state == PlaybackState.STATE_PLAYING
             playStatus.text = if (playing) "play" else "pause"
-            playControl.text = if (playing) "Ⅱ" else "▶"
+            playControl.setPlaying(playing)
             val duration = controller?.metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: 0L
             val position = state?.position ?: 0L
             trackProgress.progress = if (duration > 0L) {
@@ -388,7 +387,7 @@ class MainActivity : Activity() {
             } else 0
         } catch (_: Exception) {
             playStatus.text = "pause"
-            playControl.text = "▶"
+            playControl.setPlaying(false)
             trackProgress.progress = 0
         }
     }
@@ -478,7 +477,7 @@ class MainActivity : Activity() {
 
     private fun refreshQueueFromMorphe() {
         if (!::queueLayout.isInitialized) return
-        val queue = try {
+        val queueData = try {
             val manager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
             val component = ComponentName(this, MusicNotificationListener::class.java)
             val controllers = manager.getActiveSessions(component)
@@ -489,19 +488,28 @@ class MainActivity : Activity() {
             } ?: controllers.firstOrNull {
                 it.packageName.contains("youtube", true) || it.packageName.contains("morphe", true)
             }
-            controller?.queue.orEmpty().mapNotNull {
-                it.description.title?.toString()?.trim()
-            }.filter { it.isNotBlank() }
+            val currentQueueId = controller?.let { active ->
+                active.queue?.firstOrNull { item ->
+                    item.description.title?.toString() == active.metadata?.getString(
+                        android.media.MediaMetadata.METADATA_KEY_TITLE
+                    )
+                }?.queueId
+            }
+            Pair(currentQueueId, controller?.queue.orEmpty().mapNotNull { item ->
+                val title = item.description.title?.toString()?.trim()
+                if (title.isNullOrBlank()) null else Pair(item.queueId, title)
+            })
         } catch (_: Exception) {
-            emptyList()
+            Pair(null, emptyList())
         }
 
-        val signature = queue.joinToString("|")
+        val signature = queueData.first.toString() + "|" +
+            queueData.second.joinToString("|") { it.first.toString() + ":" + it.second }
         if (signature == lastQueueSignature && queueLayout.childCount > 0) return
         lastQueueSignature = signature
         queueLayout.removeAllViews()
 
-        if (queue.isEmpty()) {
+        if (queueData.second.isEmpty()) {
             queueLayout.addView(TextView(this).apply {
                 text = "Morphe no está compartiendo su lista de reproducción ahora. Los controles de canción seguirán funcionando."
                 setTextColor(Color.LTGRAY)
@@ -510,12 +518,15 @@ class MainActivity : Activity() {
             return
         }
 
-        queue.take(30).forEachIndexed { index, song ->
+        queueData.second.take(30).forEachIndexed { index, item ->
+            val isCurrent = item.first == queueData.first
             queueLayout.addView(TextView(this).apply {
-                text = "${index + 1}. $song"
-                textSize = 15f
-                setTextColor(Color.WHITE)
-                setPadding(5, 9, 5, 9)
+                text = (if (isCurrent) "▶  " else "   ") + (index + 1).toString() + ". " + item.second +
+                    if (isCurrent) "   · REPRODUCIENDO" else ""
+                textSize = if (isCurrent) 15f else 14f
+                setTextColor(if (isCurrent) Color.rgb(190, 165, 255) else Color.WHITE)
+                if (isCurrent) typeface = Typeface.DEFAULT_BOLD
+                setPadding(5, 10, 5, 10)
             })
         }
     }
@@ -560,4 +571,58 @@ class MainActivity : Activity() {
         super.onPause()
         handler.removeCallbacks(refreshTask)
     }
+    private inner class IconControlView(context: android.content.Context, private val kind: String) :
+        View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            strokeWidth = 3.8f
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            style = Paint.Style.STROKE
+        }
+        private var playing = false
+
+        fun setPlaying(value: Boolean) {
+            playing = value
+            invalidate()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val cx = width / 2f
+            val cy = height / 2f
+            val unit = minOf(width, height) / 2.8f
+            paint.style = Paint.Style.FILL
+            if (kind == "previous" || kind == "next") {
+                val direction = if (kind == "previous") -1f else 1f
+                val path = Path().apply {
+                    moveTo(cx + direction * unit * 0.65f, cy)
+                    lineTo(cx - direction * unit * 0.35f, cy - unit * 0.72f)
+                    lineTo(cx - direction * unit * 0.35f, cy + unit * 0.72f)
+                    close()
+                }
+                canvas.drawPath(path, paint)
+                paint.style = Paint.Style.STROKE
+                val x = cx - direction * unit * 0.72f
+                canvas.drawLine(x, cy - unit * 0.72f, x, cy + unit * 0.72f, paint)
+                val x2 = cx + direction * unit * 0.92f
+                canvas.drawLine(x2, cy - unit * 0.72f, x2, cy + unit * 0.72f, paint)
+            } else if (playing) {
+                paint.strokeWidth = 5f
+                canvas.drawRoundRect(cx - unit * 0.42f, cy - unit * 0.72f,
+                    cx - unit * 0.08f, cy + unit * 0.72f, 3f, 3f, paint)
+                canvas.drawRoundRect(cx + unit * 0.08f, cy - unit * 0.72f,
+                    cx + unit * 0.42f, cy + unit * 0.72f, 3f, 3f, paint)
+            } else {
+                val path = Path().apply {
+                    moveTo(cx - unit * 0.42f, cy - unit * 0.78f)
+                    lineTo(cx + unit * 0.72f, cy)
+                    lineTo(cx - unit * 0.42f, cy + unit * 0.78f)
+                    close()
+                }
+                canvas.drawPath(path, paint)
+            }
+        }
+    }
+
 }
