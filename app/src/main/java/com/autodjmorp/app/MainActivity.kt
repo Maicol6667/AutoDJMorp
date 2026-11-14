@@ -131,9 +131,9 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         }
 
-        val previousButton = makeButton("⏮")
-        val playButton = makeButton("▶ / ⏸")
-        val nextButton = makeButton("⏭")
+        val previousButton = makeControlButton("⏮", false, "Canción anterior")
+        val playButton = makeControlButton("▶", true, "Reproducir o pausar")
+        val nextButton = makeControlButton("⏭", false, "Siguiente canción")
 
         previousButton.setOnClickListener {
             sendMediaCommand("previous")
@@ -147,9 +147,9 @@ class MainActivity : Activity() {
             sendMediaCommand("next")
         }
 
-        controls.addView(previousButton, buttonParams())
-        controls.addView(playButton, buttonParams())
-        controls.addView(nextButton, buttonParams())
+        controls.addView(previousButton, controlButtonParams())
+        controls.addView(playButton, controlButtonParams())
+        controls.addView(nextButton, controlButtonParams())
 
         content.addView(controls)
 
@@ -241,6 +241,44 @@ class MainActivity : Activity() {
                 Color.rgb(0, 145, 105),
                 14
             )
+        }
+    }
+
+    private fun makeControlButton(
+        symbol: String,
+        primary: Boolean,
+        description: String
+    ): TextView {
+        return TextView(this).apply {
+            text = symbol
+            contentDescription = description
+            gravity = Gravity.CENTER
+            textSize = if (primary) 27f else 24f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(
+                    if (primary) Color.rgb(116, 82, 220)
+                    else Color.rgb(35, 40, 55)
+                )
+                setStroke(
+                    if (primary) 0 else 2,
+                    if (primary) Color.TRANSPARENT else Color.rgb(91, 103, 133)
+                )
+            }
+            elevation = if (primary) 8f else 3f
+            isClickable = true
+            isFocusable = true
+        }
+    }
+
+    private fun controlButtonParams(): LinearLayout.LayoutParams {
+        return LinearLayout.LayoutParams(
+            64,
+            64
+        ).apply {
+            setMargins(10, 8, 10, 8)
         }
     }
 
