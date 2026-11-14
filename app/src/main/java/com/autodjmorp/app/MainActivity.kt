@@ -1,3 +1,4 @@
+
 package com.autodjmorp
 
 import android.app.Activity
@@ -5,21 +6,16 @@ import android.app.AlertDialog
 import android.os.Bundle
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.*
-import android.graphics.drawable.GradientDrawable
 
 class MainActivity : Activity() {
 
-    private val songs = mutableListOf<String>(
-        "Agrega tu primera canción"
-    )
-
+    private val songs = mutableListOf<String>()
     private lateinit var queueLayout: LinearLayout
     private lateinit var statusText: TextView
-
-    private var transitionEnabled = true
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
@@ -45,13 +41,18 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun addSpace(layout: LinearLayout, height: Int) {
+        val space = View(this)
+        layout.addView(space, LinearLayout.LayoutParams(1, dp(height)))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         window.statusBarColor = Color.rgb(15, 23, 42)
         window.navigationBarColor = Color.rgb(15, 23, 42)
 
-        val background = Color.rgb(15, 23, 42)
+        val backgroundColor = Color.rgb(15, 23, 42)
         val cardColor = Color.rgb(30, 41, 59)
         val white = Color.WHITE
         val gray = Color.rgb(203, 213, 225)
@@ -59,7 +60,7 @@ class MainActivity : Activity() {
         val green = Color.rgb(52, 211, 153)
 
         val scroll = ScrollView(this)
-        scroll.setBackgroundColor(background)
+        scroll.setBackgroundColor(backgroundColor)
 
         val main = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -80,11 +81,7 @@ class MainActivity : Activity() {
         heading.addView(text("AUTO DJ", 30f, white, true))
         heading.addView(text("MORPHE · AUTOMATIC MIX", 11f, gray))
 
-        header.addView(
-            heading,
-            LinearLayout.LayoutParams(0, -2, 1f)
-        )
-
+        header.addView(heading, LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(text("● ACTIVO", 12f, green, true))
         main.addView(header)
 
@@ -93,34 +90,18 @@ class MainActivity : Activity() {
         val currentCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(18), dp(18), dp(18))
-            background = makeBackground(cardColor, 18)
+            setBackground(makeBackground(cardColor, 18))
         }
 
-        currentCard.addView(
-            text("REPRODUCIENDO AHORA", 12f, green, true)
-        )
-
+        currentCard.addView(text("REPRODUCIENDO AHORA", 12f, green, true))
         addSpace(currentCard, 15)
-
-        currentCard.addView(
-            text("♫  Canción actual", 23f, white, true)
-        )
-
+        currentCard.addView(text("♫  Canción actual", 23f, white, true))
         addSpace(currentCard, 5)
-
-        currentCard.addView(
-            text("YouTube Music Morphe", 14f, gray)
-        )
-
+        currentCard.addView(text("YouTube Music Morphe", 14f, gray))
         addSpace(currentCard, 20)
 
-        statusText = text(
-            "Esperando conexión con YouTube Music",
-            12f,
-            gray
-        )
+        statusText = text("Esperando conexión con YouTube Music", 12f, gray)
         currentCard.addView(statusText)
-
         main.addView(currentCard)
 
         addSpace(main, 22)
@@ -129,20 +110,15 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(16))
-            background = makeBackground(cardColor, 16)
+            setBackground(makeBackground(cardColor, 16))
         }
 
         val transitionLabel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
-        transitionLabel.addView(
-            text("MEZCLA AUTOMÁTICA", 15f, white, true)
-        )
-
-        transitionLabel.addView(
-            text("Transición gradual de volumen", 12f, gray)
-        )
+        transitionLabel.addView(text("MEZCLA AUTOMÁTICA", 15f, white, true))
+        transitionLabel.addView(text("Transición gradual de volumen", 12f, gray))
 
         transitionCard.addView(
             transitionLabel,
@@ -152,7 +128,6 @@ class MainActivity : Activity() {
         val switch = Switch(this).apply {
             isChecked = true
             setOnCheckedChangeListener { _, checked ->
-                transitionEnabled = checked
                 statusText.text = if (checked) {
                     "Transición automática activada"
                 } else {
@@ -165,9 +140,7 @@ class MainActivity : Activity() {
         main.addView(transitionCard)
 
         addSpace(main, 28)
-
         main.addView(text("PRÓXIMAS CANCIONES", 17f, white, true))
-
         addSpace(main, 12)
 
         queueLayout = LinearLayout(this).apply {
@@ -182,48 +155,28 @@ class MainActivity : Activity() {
             text = "+  AGREGAR CANCIÓN"
             textSize = 14f
             setTextColor(white)
-            background = makeBackground(blue, 14)
-            setOnClickListener {
-                addSong()
-            }
+            setBackground(makeBackground(blue, 14))
+            setOnClickListener { addSong() }
         }
 
-        main.addView(
-            addButton,
-            LinearLayout.LayoutParams(-1, dp(55))
-        )
+        main.addView(addButton, LinearLayout.LayoutParams(-1, dp(55)))
 
         addSpace(main, 20)
 
-        val footer = text(
-            "AUTO DJ MORPHE · VERSIÓN 1.0",
-            11f,
-            gray
-        )
+        val footer = text("AUTO DJ MORPHE · VERSIÓN 1.0", 11f, gray)
         footer.gravity = Gravity.CENTER
         main.addView(footer)
 
         setContentView(scroll)
-
         refreshQueue()
-    }
-
-    private fun addSpace(layout: LinearLayout, height: Int) {
-        val space = View(this)
-        layout.addView(
-            space,
-            LinearLayout.LayoutParams(1, dp(height))
-        )
     }
 
     private fun refreshQueue() {
         queueLayout.removeAllViews()
 
-        if (songs.size == 1 &&
-            songs[0] == "Agrega tu primera canción") {
+        if (songs.isEmpty()) {
             queueLayout.addView(
-                text("Tu lista está vacía. Agrega canciones.", 13f,
-                    Color.LTGRAY)
+                text("Tu lista está vacía. Agrega canciones.", 13f, Color.LTGRAY)
             )
             return
         }
@@ -234,14 +187,10 @@ class MainActivity : Activity() {
                 textSize = 15f
                 setTextColor(Color.WHITE)
                 setPadding(dp(15), dp(18), dp(15), dp(18))
-                background = makeBackground(
-                    Color.rgb(30, 41, 59), 12
-                )
+                setBackground(makeBackground(Color.rgb(30, 41, 59), 12))
             }
 
-            val params = LinearLayout.LayoutParams(
-                -1, -2
-            )
+            val params = LinearLayout.LayoutParams(-1, -2)
             params.bottomMargin = dp(9)
             queueLayout.addView(item, params)
         }
@@ -258,13 +207,7 @@ class MainActivity : Activity() {
             .setView(input)
             .setPositiveButton("Agregar") { _, _ ->
                 val name = input.text.toString().trim()
-
                 if (name.isNotEmpty()) {
-                    if (songs.size == 1 &&
-                        songs[0] == "Agrega tu primera canción") {
-                        songs.clear()
-                    }
-
                     songs.add(name)
                     refreshQueue()
                 }
