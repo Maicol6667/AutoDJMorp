@@ -49,7 +49,7 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(22, 25, 22, 25)
-            setBackgroundColor(Color.rgb(247, 247, 247))
+            setBackgroundColor(Color.BLACK)
         }
 
         val scroll = ScrollView(this)
@@ -60,7 +60,7 @@ class MainActivity : Activity() {
         val title = TextView(this).apply {
             text = "AUTO DJ"
             textSize = 30f
-            setTextColor(Color.rgb(59, 53, 60))
+            setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
         }
@@ -70,7 +70,7 @@ class MainActivity : Activity() {
         val subtitle = TextView(this).apply {
             text = "Tu mezclador automático"
             textSize = 14f
-            setTextColor(Color.rgb(105, 99, 106))
+            setTextColor(Color.LTGRAY)
             gravity = Gravity.CENTER
             setPadding(0, 5, 0, 25)
         }
@@ -91,7 +91,7 @@ class MainActivity : Activity() {
         statusRow.addView(TextView(this).apply {
             text = "♪"
             textSize = 25f
-            setTextColor(Color.rgb(59, 53, 60))
+            setTextColor(Color.WHITE)
             setPadding(0, 0, 9, 0)
         })
         playStatus = TextView(this).apply {
@@ -112,15 +112,15 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             setPadding(24, 30, 24, 24)
             background = GradientDrawable().apply {
-                setColor(Color.WHITE)
-                setStroke(2, Color.rgb(59, 53, 60))
+                setColor(Color.BLACK)
+                setStroke(2, Color.rgb(75, 70, 80))
             }
         }
 
         currentSongText = TextView(this).apply {
             text = "Esperando canción..."
             textSize = 19f
-            setTextColor(Color.rgb(59, 53, 60))
+            setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 5)
@@ -130,7 +130,7 @@ class MainActivity : Activity() {
         artistText = TextView(this).apply {
             text = "Abre YouTube Music Morphe"
             textSize = 13f
-            setTextColor(Color.rgb(105, 99, 106))
+            setTextColor(Color.LTGRAY)
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 22)
         }
@@ -139,12 +139,12 @@ class MainActivity : Activity() {
         trackProgress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 1000
             progress = 0
-            progressTintList = ColorStateList.valueOf(Color.rgb(59, 53, 60))
-            progressBackgroundTintList = ColorStateList.valueOf(Color.rgb(220, 217, 221))
+            progressTintList = ColorStateList.valueOf(Color.rgb(160, 130, 255))
+            progressBackgroundTintList = ColorStateList.valueOf(Color.rgb(75, 75, 82))
         }
         playerBox.addView(trackProgress, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 3
-        ).apply { bottomMargin = 23 })
+            LinearLayout.LayoutParams.MATCH_PARENT, 6
+        ).apply { bottomMargin = 26 })
 
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -156,21 +156,21 @@ class MainActivity : Activity() {
         previousButton.setOnClickListener { sendMediaCommand("previous") }
         playControl.setOnClickListener { sendMediaCommand("playpause") }
         nextButton.setOnClickListener { sendMediaCommand("next") }
-        controls.addView(previousButton, LinearLayout.LayoutParams(42, 42).apply {
-            setMargins(18, 0, 18, 0)
+        controls.addView(previousButton, LinearLayout.LayoutParams(58, 58).apply {
+            setMargins(14, 0, 14, 0)
         })
-        controls.addView(playControl, LinearLayout.LayoutParams(42, 42).apply {
-            setMargins(18, 0, 18, 0)
+        controls.addView(playControl, LinearLayout.LayoutParams(68, 68).apply {
+            setMargins(14, 0, 14, 0)
         })
-        controls.addView(nextButton, LinearLayout.LayoutParams(42, 42).apply {
-            setMargins(18, 0, 18, 0)
+        controls.addView(nextButton, LinearLayout.LayoutParams(58, 58).apply {
+            setMargins(14, 0, 14, 0)
         })
         playerBox.addView(controls)
         playerWrapper.addView(playerBox)
         connectionText = TextView(this).apply {
             text = "Esperando conexión con Morphe..."
             textSize = 11f
-            setTextColor(Color.rgb(105, 99, 106))
+            setTextColor(Color.LTGRAY)
             gravity = Gravity.CENTER
             setPadding(0, 12, 0, 0)
         }
@@ -263,7 +263,7 @@ class MainActivity : Activity() {
         return TextView(this).apply {
             this.text = text
             textSize = 16f
-            setTextColor(Color.rgb(59, 53, 60))
+            setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
             setPadding(0, 15, 0, 12)
         }
@@ -286,24 +286,22 @@ class MainActivity : Activity() {
         return TextView(this).apply {
             contentDescription = description
             gravity = Gravity.CENTER
-            textSize = if (kind == "pause") 21f else 23f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(if (kind == "pause") Color.WHITE else Color.rgb(59, 53, 60))
+            textSize = if (kind == "pause") 28f else 25f
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            setTextColor(Color.WHITE)
             text = when (kind) {
-                "previous" -> "◀|"
-                "next" -> "|▶"
+                "previous" -> "⏮"
+                "next" -> "⏭"
                 else -> "Ⅱ"
             }
-            if (kind == "pause") {
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(Color.rgb(59, 53, 60))
-                }
-            } else {
-                background = null
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(if (kind == "pause") Color.rgb(75, 55, 125) else Color.rgb(30, 30, 36))
+                setStroke(2, Color.rgb(110, 105, 120))
             }
             isClickable = true
             isFocusable = true
+            elevation = 4f
         }
     }
 
