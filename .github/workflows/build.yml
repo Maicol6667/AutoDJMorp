@@ -30,7 +30,7 @@ jobs:
 
       - name: Prepare permanent signing key
         env:
-          AUTODJ_SIGNING_CONFIG: \${{ secrets.AUTODJ_SIGNING_CONFIG }}
+          AUTODJ_SIGNING_CONFIG: ${{ secrets.AUTODJ_SIGNING_CONFIG }}
         run: |
           python3 - <<'PY'
           import base64, json, os
