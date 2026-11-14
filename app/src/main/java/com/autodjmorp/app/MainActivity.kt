@@ -4,6 +4,8 @@ package com.autodjmorp
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -16,6 +18,17 @@ class MainActivity : Activity() {
     private val songs = mutableListOf<String>()
     private lateinit var queueLayout: LinearLayout
     private lateinit var statusText: TextView
+    private lateinit var currentSongText: TextView
+    private lateinit var artistText: TextView
+
+    private val handler = Handler(Looper.getMainLooper())
+
+    private val updateTask = object : Runnable {
+        override fun run() {
+            updateCurrentSong()
+            handler.postDelayed(this, 1000)
+        }
+    }
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
@@ -95,9 +108,15 @@ class MainActivity : Activity() {
 
         currentCard.addView(text("REPRODUCIENDO AHORA", 12f, green, true))
         addSpace(currentCard, 15)
-        currentCard.addView(text("♫  Canción actual", 23f, white, true))
+
+        currentSongText = text("Buscando canción...", 23f, white, true)
+        currentCard.addView(currentSongText)
+
         addSpace(currentCard, 5)
-        currentCard.addView(text("YouTube Music Morphe", 14f, gray))
+
+        artistText = text("Esperando artista", 14f, gray)
+        currentCard.addView(artistText)
+
         addSpace(currentCard, 20)
 
         statusText = text("Esperando conexión con YouTube Music", 12f, gray)
@@ -125,18 +144,11 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, -2, 1f)
         )
 
-        val switch = Switch(this).apply {
+        val autoSwitch = Switch(this).apply {
             isChecked = true
-            setOnCheckedChangeListener { _, checked ->
-                statusText.text = if (checked) {
-                    "Transición automática activada"
-                } else {
-                    "Transición automática desactivada"
-                }
-            }
         }
 
-        transitionCard.addView(switch)
+        transitionCard.addView(autoSwitch)
         main.addView(transitionCard)
 
         addSpace(main, 28)
@@ -169,6 +181,39 @@ class MainActivity : Activity() {
 
         setContentView(scroll)
         refreshQueue()
+        updateCurrentSong()
+    }
+
+    private fun updateCurrentSong() {
+        val preferences = getSharedPreferences(
+            "AutoDJMusic",
+            MODE_PRIVATE
+        )
+
+        val title = preferences.getString("music_title", null)
+        val artist = preferences.getString("music_artist", "")
+
+        if (!title.isNullOrBlank()) {
+            currentSongText.text = title
+            artistText.text = artist?.ifBlank { "Artista no disponible" }
+                ?: "Artista no disponible"
+            statusText.text = "Conectado con YouTube Music"
+        } else {
+            currentSongText.text = "No se detecta ninguna canción"
+            artistText.text = "Reproduce música en YouTube Music"
+            statusText.text = "Esperando información musical"
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        handler.removeCallbacks(updateTask)
+        handler.post(updateTask)
+    }
+
+    override fun onPause() {
+        handler.removeCallbacks(updateTask)
+        super.onPause()
     }
 
     private fun refreshQueue() {
