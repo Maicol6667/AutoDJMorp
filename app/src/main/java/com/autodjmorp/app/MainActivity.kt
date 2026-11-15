@@ -204,7 +204,7 @@ class MainActivity : Activity() {
             .getBoolean("auto_advance", false)
 
         val autoSwitch = Switch(this).apply {
-            text = "AVANCE AUTOMÁTICO"
+            text = "MEZCLA AUTOMÁTICA"
             textSize = 16f
             setTextColor(Color.WHITE)
             setPadding(0, 25, 0, 8)
@@ -224,7 +224,7 @@ class MainActivity : Activity() {
         content.addView(autoSwitch)
 
         val autoDescription = TextView(this).apply {
-            text = "Pasa a la siguiente canción cuando la actual esté por terminar. Morphe controla el audio; esta versión no superpone dos canciones."
+            text = "Al quedar 3 segundos, AutoDJMorp pasa a la siguiente canción y Morphe realiza el fundido cruzado si está activado."
             textSize = 12f
             setTextColor(Color.LTGRAY)
             setPadding(0, 0, 0, 15)
@@ -662,7 +662,7 @@ class MainActivity : Activity() {
 
             val key = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE).orEmpty() +
                 "|" + duration
-            if (duration - position in 1..6500 && key != lastAutoAdvancedTrack) {
+            if (duration - position in 1..3000 && key != lastAutoAdvancedTrack) {
                 lastAutoAdvancedTrack = key
                 controller.transportControls.skipToNext()
             }
