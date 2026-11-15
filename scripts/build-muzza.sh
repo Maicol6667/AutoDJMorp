@@ -60,6 +60,24 @@ if app_name.exists():
     ), encoding="utf-8")
 else:
     raise SystemExit("Upstream app label resource missing")
+
+# Fix the upstream connectivity check: transport-only checks incorrectly
+# reject VPN-backed networks. Detect the network's Internet capability instead.
+network_utils = root / "app/src/main/java/com/maloy/muzza/utils/NetworkUtils.kt"
+if not network_utils.exists():
+    raise SystemExit("Upstream NetworkUtils.kt missing")
+network_source = network_utils.read_text(encoding="utf-8")
+old_network_check = """    return when {
+        networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> true
+        networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
+        networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> true
+        else -> false
+    }"""
+new_network_check = """    return networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)"""
+if old_network_check not in network_source:
+    raise SystemExit("Expected upstream connectivity check not found")
+network_source = network_source.replace(old_network_check, new_network_check, 1)
+network_utils.write_text(network_source, encoding="utf-8")
 PY
 
 cp app/release-key.jks "$BUILD_DIR/app/release-key.jks"
