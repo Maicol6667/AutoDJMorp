@@ -28,17 +28,18 @@ for old, new in replacements:
         raise SystemExit(f"Expected upstream Gradle setting not found: {old}")
     s = s.replace(old, new, 1)
 
-signing_anchor = '    signingConfigs {\n        getByName("debug") {'
-signing_insert = '''    signingConfigs {
+signing_anchor = '    buildTypes {'
+signing_insert = '''signingConfigs {
         create("autodjRelease") {
             storeFile = file("release-key.jks")
             storePassword = System.getenv("AUTODJ_STORE_PASSWORD")
             keyAlias = System.getenv("AUTODJ_KEY_ALIAS")
             keyPassword = System.getenv("AUTODJ_KEY_PASSWORD")
         }
-        getByName("debug") {'''
+    }
+    buildTypes {'''
 if signing_anchor not in s:
-    raise SystemExit("Could not locate upstream signingConfigs block")
+    raise SystemExit("Could not locate buildTypes block")
 s = s.replace(signing_anchor, signing_insert, 1)
 
 release_anchor = '        release {\n            isMinifyEnabled = true'
