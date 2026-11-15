@@ -41,3 +41,8 @@ android {
         jvmTarget = "17"
     }
 }
+
+
+dependencies {
+    implementation("androidx.media3:media3-exoplayer:1.7.1")
+}
